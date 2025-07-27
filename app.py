@@ -1,137 +1,131 @@
 import streamlit as st
 from PIL import Image
-import pandas as pd
-import json
-from datetime import datetime
-# AI components would use LangChain/LLM APIs
+import datetime
 
-# App configuration
+# App Configuration
 st.set_page_config(
-    page_title="Telugu Heritage Preservation",
+    page_title="Telugu Heritage Collector",
     page_icon="🇮🇳",
-    layout="wide"
+    layout="centered"
 )
+
 # Initialize session state
-if 'user_data' not in st.session_state:
-    st.session_state.user_data = {
-        'contributions': 0,
-        'favorites': [],
-        'interests': []
-    }
+if 'contributions' not in st.session_state:
+    st.session_state.contributions = []
 
-# Database connection (example - would use real DB in production)
-def get_db_connection():
-    # Would connect to PostgreSQL/MongoDB in production
-    return {
-        'stories': [],
-        'recipes': [],
-        'artifacts': []
-    }
+# Simple "database" (replace with real DB in production)
+TELUGU_HERITAGE_DATA = {
+    "artifacts": [],
+    "stories": [],
+    "recipes": []
+}
 
-# AI Guide function
-def ai_guide(query):
-    # This would connect to an actual LLM in production
-    responses = {
-        "history": "The Telugu people have a rich history dating back to...",
-        "language": "Telugu is one of the classical languages of India with...",
-        "default": "I can help you learn about Telugu heritage. Ask me about history, language, art, or traditions."
-    }
-    return responses.get(query.lower(), responses['default'])
+# ======================
+# CORE FUNCTIONS
+# ======================
 
-# Main app layout
+def save_artifact(upload, details):
+    """Save artifact to our simple database"""
+    artifact = {
+        "type": "artifact",
+        "file": upload.name,
+        "title": details.get("title", "Untitled"),
+        "description": details.get("description", ""),
+        "region": details.get("region", "Unknown"),
+        "date": datetime.datetime.now().strftime("%Y-%m-%d"),
+        "user": details.get("user", "Anonymous")
+    }
+    st.session_state.contributions.append(artifact)
+    return artifact
+
+def generate_ai_response(query):
+    """Simple AI response generator (would connect to LLM in production)"""
+    telugu_knowledge = {
+        "history": "Telugu civilization dates back to at least 400 BCE with the Andhra Satavahanas. The language has a rich literary tradition spanning over 1000 years.",
+        "temples": "Famous Telugu temples include:\n- Tirumala Venkateswara (Tirupati)\n- Srisailam Mallikarjuna\n- Bhadrachalam Sita Ramachandra\n- Lepakshi Veerabhadra",
+        "culture": "Telugu culture is known for:\n- Kuchipudi dance\n- Telugu cinema (Tollywood)\n- Ugadi festival\n- Bonalu celebrations\n- Bathukamma floral festival",
+        "language": "Telugu is a Dravidian language with 56 unique letters. It's the 3rd most spoken language in India with classical language status.",
+        "default": "I'm your Telugu heritage guide. Ask me about:\n- History\n- Temples\n- Festivals\n- Traditional arts\n- Famous personalities"
+    }
+    
+    query = query.lower()
+    for key in telugu_knowledge:
+        if key in query:
+            return telugu_knowledge[key]
+    return telugu_knowledge["default"]
+
+# ======================
+# PAGE LAYOUT
+# ======================
+
 def main():
-    st.title("Telugu Heritage Preservation Platform")
-    st.subheader("Documenting and Celebrating Our Cultural Legacy")
+    st.title("Preserving Telugu Heritage")
+    st.markdown("""
+    Welcome to our community platform for documenting and celebrating Telugu culture. 
+    Contribute artifacts, stories, and recipes, or explore our cultural heritage.
+    """)
     
     # Navigation
-    tabs = ["Home", "Contribute", "Explore", "AI Guide", "About"]
-    current_tab = st.sidebar.radio("Navigation", tabs)
+    tab1, tab2, tab3 = st.tabs(["Contribute", "AI Guide", "Explore"])
     
-    # Home Tab
-    if current_tab == "Home":
-        st.header("Welcome to Our Community Heritage Project")
-        col1, col2 = st.columns([3, 2])
-        with col1:
-            st.write("""
-            This platform aims to preserve the rich cultural heritage of the Telugu community 
-            through collective documentation and sharing. Join us in this mission to safeguard 
-            our traditions for future generations.
-            """)
-            st.image("telugu_heritage.jpg", caption="Telugu Cultural Heritage")
-        with col2:
-            st.subheader("Recent Contributions")
-            # Display recent entries from database
-            db = get_db_connection()
-            for story in db['stories'][-3:]:
-                st.write(f"**{story['title']}**")
-                st.caption(story['summary'])
+    with tab1:
+        st.header("Share a Piece of Telugu Culture")
+        contribution_type = st.radio(
+            "What would you like to contribute?",
+            ["Cultural Artifact", "Oral Story", "Traditional Recipe"],
+            horizontal=True
+        )
+        
+        if contribution_type == "Cultural Artifact":
+            with st.form("artifact_form"):
+                uploaded_file = st.file_uploader("Upload image of artifact", type=["jpg", "png", "jpeg"])
+                title = st.text_input("Title")
+                description = st.text_area("Description (significance, materials, etc.)")
+                region = st.text_input("Region/Village of origin")
+                submitted = st.form_submit_button("Submit")
+                
+                if submitted and uploaded_file:
+                    artifact = save_artifact(
+                        uploaded_file,
+                        {
+                            "title": title,
+                            "description": description,
+                            "region": region,
+                            "user": "User"  # Would replace with actual auth
+                        }
+                    )
+                    st.success(f"Thank you for contributing {artifact['title']}!")
+                    st.image(uploaded_file, caption=artifact["title"])
+        
+        # Similar forms would be added for stories and recipes
     
-    # Contribute Tab
-    elif current_tab == "Contribute":
-        st.header("Share Your Knowledge")
-        contribution_type = st.selectbox("What would you like to contribute?", 
-                                       ["Story", "Recipe", "Artifact Information", "Dialect Sample"])
+    with tab2:
+        st.header("Telugu Heritage Guide")
+        st.caption("Ask me anything about Telugu history, culture, or traditions")
         
-        if contribution_type == "Story":
-            with st.form("story_form"):
-                title = st.text_input("Story Title")
-                story = st.text_area("The Story")
-                region = st.selectbox("Region of Origin", ["Andhra Pradesh", "Telangana", "Yanam", "Other"])
-                storyteller = st.text_input("Your Name (optional)")
-                submitted = st.form_submit_button("Submit Story")
-                if submitted:
-                    # Add to database
-                    db = get_db_connection()
-                    db['stories'].append({
-                        'title': title,
-                        'story': story,
-                        'region': region,
-                        'contributor': storyteller,
-                        'date': datetime.now().strftime("%Y-%m-%d")
-                    })
-                    st.success("Thank you for preserving our heritage!")
-        
-        # Similar forms for other contribution types...
-    
-    # Explore Tab
-    elif current_tab == "Explore":
-        st.header("Discover Telugu Heritage")
-        explore_option = st.selectbox("What would you like to explore?", 
-                                    ["Stories", "Recipes", "Artifacts", "Language"])
-        
-        if explore_option == "Stories":
-            db = get_db_connection()
-            for story in db['stories']:
-                with st.expander(story['title']):
-                    st.write(story['story'])
-                    st.caption(f"From {story['region']} | Contributed by {story['contributor']}")
-    
-    # AI Guide Tab
-    elif current_tab == "AI Guide":
-        st.header("Telugu Heritage AI Guide")
-        st.write("Ask me anything about Telugu history, culture, or traditions")
-        
-        user_query = st.text_input("Your question about Telugu heritage:")
+        user_query = st.text_input("Your question about Telugu heritage", key="ai_query")
         if user_query:
-            response = ai_guide(user_query)
-            st.write(response)
+            response = generate_ai_response(user_query)
+            st.markdown(f"**Heritage Guide:**\n\n{response}")
             
-            # Could add follow-up questions here
-            if "history" in user_query.lower():
-                st.write("Would you like to know more about:")
-                if st.button("Ancient Telugu Kingdoms"):
-                    st.write(ai_guide("Ancient Telugu Kingdoms"))
-                if st.button("Telugu Literature"):
-                    st.write(ai_guide("Telugu Literature"))
+            # Example follow-up for temples
+            if "temple" in user_query.lower():
+                st.button("Show me famous Telugu temples")
+                # Would expand with more interactive elements
     
-    # About Tab
-    else:
-        st.header("About This Project")
-        st.write("""
-        This platform was created to preserve the diverse cultural heritage of the Telugu people.
-        Our mission is to document traditions, stories, recipes, and artifacts before they are lost.
-        """)
-        st.write("Join our community effort to keep our culture alive!")
+    with tab3:
+        st.header("Explore Telugu Heritage")
+        
+        if st.session_state.contributions:
+            st.subheader("Recent Contributions")
+            for item in st.session_state.contributions[-3:]:  # Show 3 most recent
+                with st.expander(f"{item['title']} from {item['region']}"):
+                    st.caption(f"Contributed on {item['date']}")
+                    st.write(item["description"])
+        else:
+            st.info("No contributions yet. Be the first to share!")
+        
+        # Would add more exploration features here
 
 if __name__ == "__main__":
     main()
